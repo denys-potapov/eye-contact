@@ -3,6 +3,8 @@ import cv2
 import sys
 import dlib
 import numpy as np
+import math
+
 
 MODEL_PATH = 'shape_predictor_68_face_landmarks.dat'
 
@@ -18,7 +20,10 @@ def scale_box2d(box, scale):
     h, w = box[1]
     return (box[0], (h * scale, w * scale), box[2])
 
+# def to_polar(p1, p2):
+#     """get a length and angel"""
 
+#     dx = p2[0] p1[0]
 class EyeContact:
     """EyeContact."""
 
@@ -42,13 +47,17 @@ class EyeContact:
         self.mask = cv2.GaussianBlur(self.mask, (EYE_BLUR, EYE_BLUR), 0)
 
         # crop everythong
-        print(cv2.boxPoints(elipses[1]), elipses[1])
         points = list(cv2.boxPoints(elipses[0])) + list(cv2.boxPoints(elipses[1]))
-
-        print(points)
         (left, top, w, h) = cv2.boundingRect(np.array(points))
-        cv2.rectangle(self.img, (left, top, w, h), (255, 0,  0), 2)
-        print(left, top, w, h)
+        left, top = left - EYE_BLUR, top - EYE_BLUR
+        w, h = w + EYE_BLUR * 2, h + EYE_BLUR * 2
+        self.img = self.img[top:top + h, left: left + w]
+        self.mask = self.mask[top:top + h, left: left + w]
+
+        self.centers = [(x - left, y - top) for (x, y) in self.centers]
+        print(self.centers)
+        # 
+        # ]
 
     def detect_eyes(self, img):
         """Detect eyes on image."""
