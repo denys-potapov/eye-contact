@@ -14,6 +14,8 @@ LEFT_EYE_RANGE = (42, 48)
 EYE_SCALE = 1.5
 EYE_BLUR = 21
 
+DEFAULT_SCALE = 320
+
 
 def centers2(points):
     """Return eye centers and averall center."""
@@ -39,10 +41,11 @@ def to_polar(p1, p2):
 class EyeContact:
     """EyeContact."""
 
-    def __init__(self, img):
+    def __init__(self, img, scale=DEFAULT_SCALE):
         """Init the eyes replacer."""
         self.img = img
         self.mask = np.zeros(img.shape[:2], dtype=np.uint8)
+        self.scale = scale
         # dlib
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(MODEL_PATH)
@@ -78,8 +81,8 @@ class EyeContact:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         h, w = gray.shape
-        scale = w // 320
-        gray = cv2.resize(gray, (320, h // scale))
+        scale = w // self.scale
+        gray = cv2.resize(gray, (self.scale, h // scale))
 
         rects = self.detector(gray, 1)
         # we assume only one face

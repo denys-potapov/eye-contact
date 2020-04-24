@@ -18,3 +18,24 @@ Download and uncompress pretrained face model:
 ## Preview
 
     python3 preview.py open.jpg video.webm out.avi --vertical
+
+## Live
+
+Inslall v4l2loopback
+
+    sudo apt install v4l2loopback-dkms
+
+Enable and create eye opener camera:
+
+    sudo modprobe v4l2loopback card_label="Eye contact" exclusive_caps=1
+
+This shoud create new video device (`/dev/video1` usually).
+
+Capture your open eyes photo from real camera:
+    
+    python3 capture.py open.jpg /dev/video0 
+
+Runt it:
+
+    python3 eye_contact.py open.jpg /dev/video0 /dev/video1
+
