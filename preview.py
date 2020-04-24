@@ -33,6 +33,19 @@ def main(sample, video, outp, vertical):
 
         axis = 0 if vertical else 1
         frame = np.concatenate((orig, new), axis=axis)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        x, y = 10, 50
+        cv2.putText(
+            frame, 'Original', (x, y), font,
+            1, (255, 0, 0), 2, cv2.LINE_AA)
+        if vertical:
+            y = y + h // 2
+        else:
+            x = x + w // 2
+        cv2.putText(
+            frame, 'Eye contact', (x, y), font,
+            1, (255, 0, 0), 2, cv2.LINE_AA)
         out.write(frame)
 
     out.release()

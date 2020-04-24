@@ -11,8 +11,8 @@ MODEL_PATH = 'shape_predictor_68_face_landmarks.dat'
 RIGHT_EYE_RANGE = (36, 42)
 LEFT_EYE_RANGE = (42, 48)
 
-EYE_SCALE = 2.0
-EYE_BLUR = 21
+EYE_SCALE = 1.5
+EYE_BLUR = 11
 
 
 def centers2(points):
@@ -76,6 +76,11 @@ class EyeContact:
     def detect_eyes(self, img):
         """Detect eyes on image."""
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        h, w = gray.shape
+        scale = w // 320
+        gray = cv2.resize(gray, (320, h // scale))
+
         rects = self.detector(gray, 1)
         # we assume only one face
         if len(rects) != 1:
@@ -83,7 +88,7 @@ class EyeContact:
 
         shape = self.predictor(gray, rects[0])
         shape = [(shape.part(i).x, shape.part(i).y) for i in range(0, 68)]
-        shape = np.array(shape)
+        shape = np.array(shape) * scale
 
         return [
             shape[RIGHT_EYE_RANGE[0]:RIGHT_EYE_RANGE[1]],
@@ -105,19 +110,21 @@ class EyeContact:
         patch_mask = cv2.warpAffine(self.mask, m, (w, h))
         patch_mask = cv2.merge(3 * [patch_mask])
 
-        x, y = int(center[0] - self.center[0]), int(center[1] - self.center[1])
+        x = int(round(center[0] - self.center[0]))
+        y = int(round(center[1] - self.center[1]))
         patched = patch.astype(float) * patch_mask / 255
-        x1, y1 = x + w, y + h 
-        if x < 0 or y < 0 or y1 > self.h or x1 > self.w:
+        x1, y1 = x + w, y + h
+        if x < 0 or y < 0 or y1 > img.shape[1] or x1 > img.shape[0]:
             return img
 
         patched += img[y:y1, x:x1].astype(float) * (255 - patch_mask) / 255
         opn = img.copy()
-        opn[y:y + h, x:x + w] = patched.astype(np.uint8)
+        opn[y:y1, x:x1] = patched.astype(np.uint8)
 
         return opn
 
 if __name__ == '__main__':
+    """Not sure it's needed here."""
     open_img = cv2.imread(sys.argv[1])
     test_img = cv2.imread(sys.argv[2])
 
@@ -125,7 +132,6 @@ if __name__ == '__main__':
 
     cv2.imshow("Output", eye_contact.img)
     result = eye_contact.open_eyes(test_img)
-    cv2.imwrite('result.jpg', result)
+    cv2.imwrite(sys.argv[2] + '.result.jpg', result)
     cv2.imshow("Result", result)
-    print(eye_contact.center)
     cv2.waitKey(10000)
