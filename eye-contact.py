@@ -102,7 +102,15 @@ class EyeContact:
             self.angle - angle,
             self.length / length)
         patch = cv2.warpAffine(self.img, m, (w, h))
-        return patch
+        patch_mask = cv2.warpAffine(self.mask, m, (w, h))
+        patch_mask = cv2.merge(3 * [patch_mask])
+
+        x, y = int(center[0] - self.center[0]), int(center[1] - self.center[1])
+        patched = patch.astype(float) * patch_mask / 255
+        patched += img[y:y + h, x:x + w].astype(float) * (255 - patch_mask) / 255
+        img[y:y + h, x:x + w] = patched.astype(np.uint8)
+
+        return img
 
 
 open_img = cv2.imread(sys.argv[1])
@@ -111,6 +119,8 @@ test_img = cv2.imread(sys.argv[2])
 eye_contact = EyeContact(open_img)
 
 cv2.imshow("Output", eye_contact.img)
-cv2.imshow("Result", eye_contact.open_eyes(test_img))
+result = eye_contact.open_eyes(test_img)
+cv2.imwrite('result.jpg', result)
+cv2.imshow("Result", result)
 print(eye_contact.center)
 cv2.waitKey(10000)
