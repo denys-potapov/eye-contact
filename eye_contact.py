@@ -12,7 +12,7 @@ RIGHT_EYE_RANGE = (36, 42)
 LEFT_EYE_RANGE = (42, 48)
 
 EYE_SCALE = 1.5
-EYE_BLUR = 11
+EYE_BLUR = 21
 
 
 def centers2(points):
