@@ -2,10 +2,14 @@
 import argparse
 import cv2
 import numpy as np
+from eye_contact import EyeContact
 
 
 def main(sample, video, outp, vertical):
     """Main function."""
+    open_img = cv2.imread(sample)
+    eye_contact = EyeContact(open_img)
+
     cap = cv2.VideoCapture(video)
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -20,13 +24,15 @@ def main(sample, video, outp, vertical):
         outp,
         cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'),
         fps, (w, h))
+
     while(cap.isOpened()):
-        ret, frame = cap.read()
+        ret, orig = cap.read()
         if ret is not True:
             break
+        new = eye_contact.open_eyes(orig)
 
         axis = 0 if vertical else 1
-        frame = np.concatenate((frame, frame), axis=axis)
+        frame = np.concatenate((orig, new), axis=axis)
         out.write(frame)
 
     out.release()

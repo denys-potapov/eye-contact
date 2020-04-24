@@ -107,20 +107,25 @@ class EyeContact:
 
         x, y = int(center[0] - self.center[0]), int(center[1] - self.center[1])
         patched = patch.astype(float) * patch_mask / 255
-        patched += img[y:y + h, x:x + w].astype(float) * (255 - patch_mask) / 255
-        img[y:y + h, x:x + w] = patched.astype(np.uint8)
+        x1, y1 = x + w, y + h 
+        if x < 0 or y < 0 or y1 > self.h or x1 > self.w:
+            return img
 
-        return img
+        patched += img[y:y1, x:x1].astype(float) * (255 - patch_mask) / 255
+        opn = img.copy()
+        opn[y:y + h, x:x + w] = patched.astype(np.uint8)
 
+        return opn
 
-open_img = cv2.imread(sys.argv[1])
-test_img = cv2.imread(sys.argv[2])
+if __name__ == '__main__':
+    open_img = cv2.imread(sys.argv[1])
+    test_img = cv2.imread(sys.argv[2])
 
-eye_contact = EyeContact(open_img)
+    eye_contact = EyeContact(open_img)
 
-cv2.imshow("Output", eye_contact.img)
-result = eye_contact.open_eyes(test_img)
-cv2.imwrite('result.jpg', result)
-cv2.imshow("Result", result)
-print(eye_contact.center)
-cv2.waitKey(10000)
+    cv2.imshow("Output", eye_contact.img)
+    result = eye_contact.open_eyes(test_img)
+    cv2.imwrite('result.jpg', result)
+    cv2.imshow("Result", result)
+    print(eye_contact.center)
+    cv2.waitKey(10000)
