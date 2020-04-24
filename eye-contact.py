@@ -15,6 +15,13 @@ EYE_SCALE = 2.0
 EYE_BLUR = 21
 
 
+def centers2(points):
+    """Return eye centers and averall center."""
+    centers = [p.mean(axis=0) for p in points]
+    center = np.array(centers).mean(axis=0)
+    return center, centers
+
+
 def scale_box2d(box, scale):
     """Scale box."""
     h, w = box[1]
@@ -40,11 +47,9 @@ class EyeContact:
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(MODEL_PATH)
 
-        centers = []
         elipses = []
-        for eye in self.detect_eyes(img):
-            centers.append(eye.mean(axis=0))
-
+        eyes = self.detect_eyes(img)
+        for eye in eyes:
             ellipse = cv2.fitEllipse(eye)
             mask_ellipse = scale_box2d(ellipse, EYE_SCALE)
             elipses.append(mask_ellipse)
@@ -58,15 +63,15 @@ class EyeContact:
         (left, top, self.w, self.h) = cv2.boundingRect(np.array(points))
         left, top = left - EYE_BLUR, top - EYE_BLUR
         self.w, self.h = self.w + EYE_BLUR * 2, self.h + EYE_BLUR * 2
-        self.img = self.img[top:top + h, left: left + w]
-        self.mask = self.mask[top:top + h, left: left + w]
+        self.img = self.img[top:top + self.h, left: left + self.w]
+        self.mask = self.mask[top:top + self.h, left: left + self.w]
 
         # calculate the rest of params
+        self.center, centers = centers2(eyes)
+
         self.length, self.angle = to_polar(centers[0], centers[1])
-        self.center = (
-            (centers[1][0] + centers[0][0]) // 2,
-            (centers[1][1] + centers[0][0]) // 1
-        )
+        self.center[0] -= left
+        self.center[1] -= top
 
     def detect_eyes(self, img):
         """Detect eyes on image."""
@@ -87,8 +92,17 @@ class EyeContact:
 
     def open_eyes(self, img):
         """Replace eyes with opened."""
-        
-        return img
+        eyes = self.detect_eyes(img)
+        center, centers = centers2(eyes)
+        length, angle = to_polar(centers[0], centers[1])
+
+        w, h = self.w, self.h
+        m = cv2.getRotationMatrix2D(
+            tuple(self.center),
+            self.angle - angle,
+            self.length / length)
+        patch = cv2.warpAffine(self.img, m, (w, h))
+        return patch
 
 
 open_img = cv2.imread(sys.argv[1])
