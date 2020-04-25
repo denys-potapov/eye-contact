@@ -23,7 +23,7 @@ Download and uncompress pretrained face model:
 
 Enable and create eye opener camera:
 
-    sudo modprobe v4l2loopback card_label="Eye contact" exclusive_caps=1
+    sudo modprobe v4l2loopback card_label="Eye contact" exclusive_caps=1 max_buffers=2
 
 This shoud create new video device (`/dev/video1` usually). Check it:
 

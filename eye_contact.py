@@ -191,11 +191,11 @@ def _init_pair(source, dest):
         return -1, None, None
 
     format.fmt.pix.field = v4l2.V4L2_FIELD_NONE
-    format.fmt.pix.pixelformat = v4l2.V4L2_PIX_FMT_BGR24
+    format.fmt.pix.pixelformat = v4l2.V4L2_PIX_FMT_YUV420
     format.fmt.pix.width = width
     format.fmt.pix.height = height
     # format.fmt.pix.bytesperline = width * channels
-    format.fmt.pix.sizeimage = width * height * channels
+    format.fmt.pix.sizeimage = width * height * channels // 2
 
     result = fcntl.ioctl(dest_cap, v4l2.VIDIOC_S_FMT, format)
 
@@ -214,7 +214,7 @@ def _main_loop(eye_contact, stream, dest):
         fps = round(1. / (e - s), 1)
         if count % SHOW_FPS_EVEVRY == 0:
             print('Eye opener FPS {}'.format(fps), end='\r')  # noqa
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420)
         dest.write(frame)
 
 
@@ -230,7 +230,7 @@ if __name__ == '__main__':
         description=desc)
 
     p.add_argument('open', type=str, help='open eye frame')
-    p.add_argument('source', type=str, help='video device ex. /dev/vidoe0')
+    p.add_argument('source', type=str, help='video device ex. /dev/video0')
     p.add_argument('dest', type=str, help='video device destination')
     p.add_argument(
         '--scale', type=int, default=DEFAULT_SCALE,
