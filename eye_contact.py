@@ -5,10 +5,9 @@ import dlib
 import fcntl
 import math
 import numpy as np
-import sys
 import lib.v4l2 as v4l2
 from threading import Thread
-
+from time import perf_counter
 
 MODEL_PATH = 'shape_predictor_68_face_landmarks.dat'
 
@@ -19,6 +18,8 @@ EYE_SCALE = 1.5
 EYE_BLUR = 21
 
 DEFAULT_SCALE = 320
+
+SHOW_FPS_EVEVRY = 10
 
 
 def centers2(points):
@@ -91,7 +92,7 @@ class EyeContact:
         rects = self.detector(gray, 1)
         # we assume only one face
         if len(rects) != 1:
-            return []
+            return None
 
         shape = self.predictor(gray, rects[0])
         shape = [(shape.part(i).x, shape.part(i).y) for i in range(0, 68)]
@@ -105,6 +106,9 @@ class EyeContact:
     def open_eyes(self, img):
         """Replace eyes with opened."""
         eyes = self.detect_eyes(img)
+        if eyes is None:
+            return img
+
         center, centers = centers2(eyes)
         length, angle = to_polar(centers[0], centers[1])
 
@@ -112,7 +116,7 @@ class EyeContact:
         m = cv2.getRotationMatrix2D(
             tuple(self.center),
             self.angle - angle,
-            self.length / length)
+            length / self.length)
         patch = cv2.warpAffine(self.img, m, (w, h))
         patch_mask = cv2.warpAffine(self.mask, m, (w, h))
         patch_mask = cv2.merge(3 * [patch_mask])
@@ -198,6 +202,22 @@ def _init_pair(source, dest):
     return result, cap_source, dest_cap
 
 
+def _main_loop(eye_contact, stream, dest):
+    count = 0
+    while True:
+        count, frame = stream.read(count)
+        if frame is None:
+            continue
+        s = perf_counter()
+        frame = eye_contact.open_eyes(frame)
+        e = perf_counter()
+        fps = round(1. / (e - s), 1)
+        if count % SHOW_FPS_EVEVRY == 0:
+            print('Eye opener FPS {}'.format(fps), end='\r')  # noqa
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        dest.write(frame)
+
+
 if __name__ == '__main__':
     desc = """Eye contact
 
@@ -209,38 +229,26 @@ if __name__ == '__main__':
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=desc)
 
-    p.add_argument('open', type=str, help='opne eye frame')
+    p.add_argument('open', type=str, help='open eye frame')
     p.add_argument('source', type=str, help='video device ex. /dev/vidoe0')
     p.add_argument('dest', type=str, help='video device destination')
+    p.add_argument(
+        '--scale', type=int, default=DEFAULT_SCALE,
+        help='scale image on face detection')
     args = p.parse_args()
 
     r, src, dest = _init_pair(args.source, args.dest)
-    print('Started ({} == 0). Press ctrl+c to exit.\n\n'.format(r))
+    print('Started ({} == 0). Press ctrl+c to exit.'.format(r))
+
+    open_img = cv2.imread(args.open)
+    eye_contact = EyeContact(open_img, args.scale)
 
     stream = CapStream(src).start()
     try:
-        count = 0
-        while True:
-            count, frame = stream.read(count)
-            if frame is None:
-                continue
-            dest.write(frame)
+        _main_loop(eye_contact, stream, dest)
     except KeyboardInterrupt:
         print('Exiting')
 
     stream.stop()
     src.release()
     dest.close()
-    exit(0)
-
-    """Not sure it's needed here."""
-    open_img = cv2.imread(sys.argv[1])
-    test_img = cv2.imread(sys.argv[2])
-
-    eye_contact = EyeContact(open_img)
-
-    cv2.imshow("Output", eye_contact.img)
-    result = eye_contact.open_eyes(test_img)
-    cv2.imwrite(sys.argv[2] + '.result.jpg', result)
-    cv2.imshow("Result", result)
-    cv2.waitKey(10000)
