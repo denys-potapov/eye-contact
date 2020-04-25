@@ -4,7 +4,7 @@
 
 You need python and cmake:
     
-    sudo apt install python cmake
+    sudo apt install python cmake v4l2loopback-dkms libv4l-dev
 
 Load project deps:
 
@@ -21,15 +21,13 @@ Download and uncompress pretrained face model:
 
 ## Live
 
-Inslall v4l2loopback
-
-    sudo apt install v4l2loopback-dkms
-
 Enable and create eye opener camera:
 
     sudo modprobe v4l2loopback card_label="Eye contact" exclusive_caps=1
 
-This shoud create new video device (`/dev/video1` usually).
+This shoud create new video device (`/dev/video1` usually). Check it:
+
+    v4l2-ctl --list-devices
 
 Capture your open eyes photo from real camera:
     

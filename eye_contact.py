@@ -1,9 +1,12 @@
 """Fake eye contact."""
+import argparse
 import cv2
-import sys
 import dlib
-import numpy as np
+import fcntl
 import math
+import numpy as np
+import sys
+import lib.v4l2 as v4l2
 
 
 MODEL_PATH = 'shape_predictor_68_face_landmarks.dat'
@@ -126,7 +129,73 @@ class EyeContact:
 
         return opn
 
+
+def _init_pair(source, dest):
+    # Grab the webcam feed and get the dimensions of a frame
+    cap_source = cv2.VideoCapture(source)
+    width = int(cap_source.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap_source.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    channels = 3
+    print('Source size {}x{}'.format(width, height))
+
+    # Set up the formatting of our loopback device - boilerplate
+    format = v4l2.v4l2_format()
+    format.type = v4l2.V4L2_BUF_TYPE_VIDEO_OUTPUT
+
+    dest_cap = open(dest, 'r+b')
+    if (fcntl.ioctl(dest_cap, v4l2.VIDIOC_G_FMT, format) == -1):
+        print("Unable to get video format data.")
+        return -1, None, None
+
+    format.fmt.pix.field = v4l2.V4L2_FIELD_NONE
+    format.fmt.pix.pixelformat = v4l2.V4L2_PIX_FMT_BGR24
+    format.fmt.pix.width = width
+    format.fmt.pix.height = height
+    format.fmt.pix.bytesperline = width * channels
+    format.fmt.pix.sizeimage = width * height * channels
+
+    result = fcntl.ioctl(dest_cap, v4l2.VIDIOC_S_FMT, format)
+
+    return result, cap_source, dest_cap
+
+
+def _frame_modr(frame):
+    kernel = np.ones((5, 3)).astype(np.uint8)
+    grad = cv2.morphologyEx(frame.copy(), cv2.MORPH_GRADIENT, kernel)
+    mapped_grad = cv2.applyColorMap(grad, cv2.COLORMAP_JET)
+    return mapped_grad
+
+
 if __name__ == '__main__':
+    desc = """Eye contact
+
+    Sample usage:
+        python3 eye_contact.py open.jpg /dev/video0 /dev/video1
+    """
+
+    p = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=desc)
+
+    p.add_argument('open', type=str, help='opne eye frame')
+    p.add_argument('source', type=str, help='video device ex. /dev/vidoe0')
+    p.add_argument('dest', type=str, help='video device destination')
+    args = p.parse_args()
+
+    r, src, dest = _init_pair(args.source, args.dest)
+    print('Started ({} == 0). Press ctrl+c to exit.\n\n'.format(r))
+    try:
+        while True:
+            ret, im = src.read()
+            modded_frame = _frame_modr(im)
+            dest.write(modded_frame)
+    except KeyboardInterrupt:
+        print('Exiting')
+
+    src.release()
+    dest.close()
+    exit(0)
+
     """Not sure it's needed here."""
     open_img = cv2.imread(sys.argv[1])
     test_img = cv2.imread(sys.argv[2])
