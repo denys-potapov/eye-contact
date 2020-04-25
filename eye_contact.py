@@ -7,6 +7,7 @@ import math
 import numpy as np
 import sys
 import lib.v4l2 as v4l2
+from threading import Thread
 
 
 MODEL_PATH = 'shape_predictor_68_face_landmarks.dat'
@@ -130,6 +131,44 @@ class EyeContact:
         return opn
 
 
+class CapStream:
+    """Launch the thread to read cam async."""
+
+    def __init__(self, cap):
+        """Read first frame."""
+        self.cap = cap
+        (self.ret, self.frame) = self.cap.read()
+        self.stopped = False
+        self.count = 1
+
+    def start(self):
+        """Start the thread."""
+        Thread(target=self.update, args=()).start()
+        return self
+
+    def update(self):
+        """Loop infinitely until the thread is stopped."""
+        while True:
+            if self.stopped:
+                return
+            (ret, frame) = self.cap.read()
+            if ret is not True:
+                continue
+            self.frame = frame
+            self.count += 1
+
+    def read(self, count):
+        """Return the frame if there are new."""
+        if count == self.count:
+            return count, None
+
+        return self.count, self.frame
+
+    def stop(self):
+        """Stop."""
+        self.stopped = True
+
+
 def _init_pair(source, dest):
     # Grab the webcam feed and get the dimensions of a frame
     cap_source = cv2.VideoCapture(source)
@@ -142,7 +181,7 @@ def _init_pair(source, dest):
     format = v4l2.v4l2_format()
     format.type = v4l2.V4L2_BUF_TYPE_VIDEO_OUTPUT
 
-    dest_cap = open(dest, 'r+b')
+    dest_cap = open(dest, 'wb')
     if (fcntl.ioctl(dest_cap, v4l2.VIDIOC_G_FMT, format) == -1):
         print("Unable to get video format data.")
         return -1, None, None
@@ -151,19 +190,12 @@ def _init_pair(source, dest):
     format.fmt.pix.pixelformat = v4l2.V4L2_PIX_FMT_BGR24
     format.fmt.pix.width = width
     format.fmt.pix.height = height
-    format.fmt.pix.bytesperline = width * channels
+    # format.fmt.pix.bytesperline = width * channels
     format.fmt.pix.sizeimage = width * height * channels
 
     result = fcntl.ioctl(dest_cap, v4l2.VIDIOC_S_FMT, format)
 
     return result, cap_source, dest_cap
-
-
-def _frame_modr(frame):
-    kernel = np.ones((5, 3)).astype(np.uint8)
-    grad = cv2.morphologyEx(frame.copy(), cv2.MORPH_GRADIENT, kernel)
-    mapped_grad = cv2.applyColorMap(grad, cv2.COLORMAP_JET)
-    return mapped_grad
 
 
 if __name__ == '__main__':
@@ -184,14 +216,19 @@ if __name__ == '__main__':
 
     r, src, dest = _init_pair(args.source, args.dest)
     print('Started ({} == 0). Press ctrl+c to exit.\n\n'.format(r))
+
+    stream = CapStream(src).start()
     try:
+        count = 0
         while True:
-            ret, im = src.read()
-            modded_frame = _frame_modr(im)
-            dest.write(modded_frame)
+            count, frame = stream.read(count)
+            if frame is None:
+                continue
+            dest.write(frame)
     except KeyboardInterrupt:
         print('Exiting')
 
+    stream.stop()
     src.release()
     dest.close()
     exit(0)
